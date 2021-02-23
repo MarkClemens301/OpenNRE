@@ -44,10 +44,10 @@ parser.add_argument('--max_epoch', default=100, type=int,
 args = parser.parse_args()
 
 # Some basic settings
-root_path = 'example'
+root_path = '.'
 sys.path.append(root_path)
-if not os.path.exists('example/ckpt'):
-    os.mkdir('example/ckpt')
+if not os.path.exists('./ckpt'):
+    os.mkdir('./ckpt')
 if len(args.ckpt) == 0:
     args.ckpt = '{}_{}'.format(args.dataset, 'cnn')
 ckpt = 'ckpt/{}.pth.tar'.format(args.ckpt)
