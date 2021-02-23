@@ -1,57 +1,62 @@
 # coding:utf-8
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # no gpu
+
 import torch
 import numpy as np
 import json
 import opennre
 from opennre import encoder, model, framework
 import sys
-import os
 import argparse
 import logging
 
+print(torch.cuda.is_available())
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--pretrain_path', default='bert-base-uncased', 
-        help='Pre-trained ckpt path / model name (hugginface)')
-parser.add_argument('--ckpt', default='', 
-        help='Checkpoint name')
-parser.add_argument('--pooler', default='entity', choices=['cls', 'entity'], 
-        help='Sentence representation pooler')
-parser.add_argument('--only_test', action='store_true', 
-        help='Only run test')
-parser.add_argument('--mask_entity', action='store_true', 
-        help='Mask entity mentions')
+parser.add_argument('--pretrain_path', default='pretrain/bert-base-uncased',
+                    help='Pre-trained ckpt path / model name (hugginface)')
+parser.add_argument('--ckpt', default='',
+                    help='Checkpoint name')
+parser.add_argument('--pooler', default='entity', choices=['cls', 'entity'],
+                    help='Sentence representation pooler')
+parser.add_argument('--only_test', action='store_true',
+                    help='Only run test')
+parser.add_argument('--mask_entity', action='store_true',
+                    help='Mask entity mentions')
 
 # Data
 parser.add_argument('--metric', default='micro_f1', choices=['micro_f1', 'acc'],
-        help='Metric for picking up best checkpoint')
-parser.add_argument('--dataset', default='none', choices=['none', 'semeval', 'wiki80', 'tacred'], 
-        help='Dataset. If not none, the following args can be ignored')
-parser.add_argument('--train_file', default='', type=str,
-        help='Training data file')
-parser.add_argument('--val_file', default='', type=str,
-        help='Validation data file')
-parser.add_argument('--test_file', default='', type=str,
-        help='Test data file')
-parser.add_argument('--rel2id_file', default='', type=str,
-        help='Relation to ID file')
+                    help='Metric for picking up best checkpoint')
+parser.add_argument('--dataset', default='none', choices=['none', 'semeval', 'wiki80', 'tacred'],
+                    help='Dataset. If not none, the following args can be ignored')
+parser.add_argument('--train_file', default='train_data/train_data_0917.json', type=str,  # TODO
+                    help='Training data file')
+parser.add_argument('--val_file', default='train_data/val_data_0917.json', type=str,
+                    help='Validation data file')
+parser.add_argument('--test_file', default='train_data/test_data_0917.json', type=str,
+                    help='Test data file')
+parser.add_argument('--rel2id_file', default='train_data/semeval_rel2id.json', type=str,
+                    help='Relation to ID file')
 
 # Hyper-parameters
-parser.add_argument('--batch_size', default=64, type=int,
-        help='Batch size')
+parser.add_argument('--batch_size', default=1, type=int,  # 64
+                    help='Batch size')
 parser.add_argument('--lr', default=2e-5, type=float,
-        help='Learning rate')
-parser.add_argument('--max_length', default=128, type=int,
-        help='Maximum sentence length')
-parser.add_argument('--max_epoch', default=3, type=int,
-        help='Max number of training epochs')
+                    help='Learning rate')
+parser.add_argument('--max_length', default=64, type=int,  # 128
+                    help='Maximum sentence length')
+parser.add_argument('--max_epoch', default=3, type=int,#3
+                    help='Max number of training epochs')
 
 args = parser.parse_args()
 
 # Some basic settings
-root_path = 'example'
+root_path = '.'
 sys.path.append(root_path)
-if not os.path.exists('example/ckpt'):
-    os.mkdir('example/ckpt')
+if not os.path.exists('./ckpt'):
+    os.mkdir('./ckpt')
 if len(args.ckpt) == 0:
     args.ckpt = '{}_{}_{}'.format(args.dataset, args.pretrain_path, args.pooler)
 ckpt = 'ckpt/{}.pth.tar'.format(args.ckpt)
@@ -70,8 +75,10 @@ if args.dataset != 'none':
     else:
         args.metric = 'micro_f1'
 else:
-    if not (os.path.exists(args.train_file) and os.path.exists(args.val_file) and os.path.exists(args.test_file) and os.path.exists(args.rel2id_file)):
-        raise Exception('--train_file, --val_file, --test_file and --rel2id_file are not specified or files do not exist. Or specify --dataset')
+    if not (os.path.exists(args.train_file) and os.path.exists(args.val_file) and os.path.exists(
+            args.test_file) and os.path.exists(args.rel2id_file)):
+        raise Exception(
+            '--train_file, --val_file, --test_file and --rel2id_file are not specified or files do not exist. Or specify --dataset')
 
 logging.info('Arguments:')
 for arg in vars(args):
@@ -82,13 +89,13 @@ rel2id = json.load(open(args.rel2id_file))
 # Define the sentence encoder
 if args.pooler == 'entity':
     sentence_encoder = opennre.encoder.BERTEntityEncoder(
-        max_length=args.max_length, 
+        max_length=args.max_length,
         pretrain_path=args.pretrain_path,
         mask_entity=args.mask_entity
     )
 elif args.pooler == 'cls':
     sentence_encoder = opennre.encoder.BERTEncoder(
-        max_length=args.max_length, 
+        max_length=args.max_length,
         pretrain_path=args.pretrain_path,
         mask_entity=args.mask_entity
     )
@@ -99,8 +106,8 @@ else:
 model = opennre.model.SoftmaxNN(sentence_encoder, len(rel2id), rel2id)
 
 # Define the whole training framework
-framework = opennre.framework.SentenceRE(
-    train_path=args.train_file,
+framework = opennre.framework.SentenceRE(  # SentenceRE.SentenceRELoader.SentenceREDataset
+    train_path=args.train_file,  # opennre/framework/data_loader.py:106  # num_workers=0
     val_path=args.val_file,
     test_path=args.test_file,
     model=model,
@@ -113,7 +120,7 @@ framework = opennre.framework.SentenceRE(
 
 # Train the model
 if not args.only_test:
-    framework.train_model('micro_f1')
+    framework.train_model('micro_f1')  # === Epoch 0 train ===
 
 # Test
 framework.load_state_dict(torch.load(ckpt)['state_dict'])

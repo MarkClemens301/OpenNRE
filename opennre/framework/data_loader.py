@@ -4,10 +4,12 @@ import os, random, json, logging
 import numpy as np
 import sklearn.metrics
 
+
 class SentenceREDataset(data.Dataset):
     """
     Sentence-level relation extraction dataset
     """
+
     def __init__(self, path, rel2id, tokenizer, kwargs):
         """
         Args:
@@ -22,34 +24,36 @@ class SentenceREDataset(data.Dataset):
         self.kwargs = kwargs
 
         # Load the file
-        f = open(path)
+        # f = open(path)
+        f = open(path, 'r', encoding='utf-8')#TODO
         self.data = []
         for line in f.readlines():
             line = line.rstrip()
             if len(line) > 0:
                 self.data.append(eval(line))
         f.close()
-        logging.info("Loaded sentence RE dataset {} with {} lines and {} relations.".format(path, len(self.data), len(self.rel2id)))
-        
+        logging.info("Loaded sentence RE dataset {} with {} lines and {} relations.".format(path, len(self.data),
+                                                                                            len(self.rel2id)))
+
     def __len__(self):
         return len(self.data)
-    
+
     def __getitem__(self, index):
         item = self.data[index]
         seq = list(self.tokenizer(item, **self.kwargs))
         res = [self.rel2id[item['relation']]] + seq
-        return [self.rel2id[item['relation']]] + seq # label, seq1, seq2, ...
-    
+        return [self.rel2id[item['relation']]] + seq  # label, seq1, seq2, ...
+
     def collate_fn(data):
         data = list(zip(*data))
         labels = data[0]
         seqs = data[1:]
-        batch_labels = torch.tensor(labels).long() # (B)
+        batch_labels = torch.tensor(labels).long()  # (B)
         batch_seqs = []
         for seq in seqs:
-            batch_seqs.append(torch.cat(seq, 0)) # (B, L)
+            batch_seqs.append(torch.cat(seq, 0))  # (B, L)
         return [batch_labels] + batch_seqs
-    
+
     def eval(self, pred_result, use_name=False):
         """
         Args:
@@ -82,7 +86,7 @@ class SentenceREDataset(data.Dataset):
                 if golden != neg:
                     correct_positive += 1
             if golden != neg:
-                gold_positive +=1
+                gold_positive += 1
             if pred_result[i] != neg:
                 pred_positive += 1
         acc = float(correct) / float(total)
@@ -101,22 +105,25 @@ class SentenceREDataset(data.Dataset):
         result = {'acc': acc, 'micro_p': micro_p, 'micro_r': micro_r, 'micro_f1': micro_f1}
         logging.info('Evaluation result: {}.'.format(result))
         return result
-    
-def SentenceRELoader(path, rel2id, tokenizer, batch_size, 
-        shuffle, num_workers=8, collate_fn=SentenceREDataset.collate_fn, **kwargs):
-    dataset = SentenceREDataset(path = path, rel2id = rel2id, tokenizer = tokenizer, kwargs=kwargs)
+
+
+def SentenceRELoader(path, rel2id, tokenizer, batch_size,
+                     shuffle, num_workers=0, collate_fn=SentenceREDataset.collate_fn, **kwargs):  # TODO num_workers=8,
+    dataset = SentenceREDataset(path=path, rel2id=rel2id, tokenizer=tokenizer, kwargs=kwargs)
     data_loader = data.DataLoader(dataset=dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            pin_memory=True,
-            num_workers=num_workers,
-            collate_fn=collate_fn)
+                                  batch_size=batch_size,
+                                  shuffle=shuffle,
+                                  pin_memory=True,
+                                  num_workers=num_workers,
+                                  collate_fn=collate_fn)
     return data_loader
+
 
 class BagREDataset(data.Dataset):
     """
     Bag-level relation extraction dataset. Note that relation of NA should be named as 'NA'.
     """
+
     def __init__(self, path, rel2id, tokenizer, entpair_as_bag=False, bag_size=0, mode=None):
         """
         Args:
@@ -167,7 +174,7 @@ class BagREDataset(data.Dataset):
             self.weight = torch.from_numpy(self.weight)
         else:
             pass
-  
+
     def __len__(self):
         return len(self.bag_scope)
 
@@ -179,7 +186,7 @@ class BagREDataset(data.Dataset):
             else:
                 resize_bag = bag + list(np.random.choice(bag, self.bag_size - len(bag)))
             bag = resize_bag
-            
+
         seqs = None
         rel = self.rel2id[self.data[bag[0]]['relation']]
         for sent_id in bag:
@@ -192,24 +199,25 @@ class BagREDataset(data.Dataset):
             for i in range(len(seq)):
                 seqs[i].append(seq[i])
         for i in range(len(seqs)):
-            seqs[i] = torch.cat(seqs[i], 0) # (n, L), n is the size of bag
+            seqs[i] = torch.cat(seqs[i], 0)  # (n, L), n is the size of bag
         return [rel, self.bag_name[index], len(bag)] + seqs
-  
+
     def collate_fn(data):
         data = list(zip(*data))
         label, bag_name, count = data[:3]
         seqs = data[3:]
         for i in range(len(seqs)):
-            seqs[i] = torch.cat(seqs[i], 0) # (sumn, L)
-            seqs[i] = seqs[i].expand((torch.cuda.device_count() if torch.cuda.device_count() > 0 else 1, ) + seqs[i].size())
-        scope = [] # (B, 2)
+            seqs[i] = torch.cat(seqs[i], 0)  # (sumn, L)
+            seqs[i] = seqs[i].expand(
+                (torch.cuda.device_count() if torch.cuda.device_count() > 0 else 1,) + seqs[i].size())
+        scope = []  # (B, 2)
         start = 0
         for c in count:
             scope.append((start, start + c))
             start += c
-        assert(start == seqs[0].size(1))
+        assert (start == seqs[0].size(1))
         scope = torch.tensor(scope).long()
-        label = torch.tensor(label).long() # (B)
+        label = torch.tensor(label).long()  # (B)
         return [label, bag_name, scope] + seqs
 
     def collate_bag_size_fn(data):
@@ -217,16 +225,15 @@ class BagREDataset(data.Dataset):
         label, bag_name, count = data[:3]
         seqs = data[3:]
         for i in range(len(seqs)):
-            seqs[i] = torch.stack(seqs[i], 0) # (batch, bag, L)
-        scope = [] # (B, 2)
+            seqs[i] = torch.stack(seqs[i], 0)  # (batch, bag, L)
+        scope = []  # (B, 2)
         start = 0
         for c in count:
             scope.append((start, start + c))
             start += c
-        label = torch.tensor(label).long() # (B)
+        label = torch.tensor(label).long()  # (B)
         return [label, bag_name, scope] + seqs
 
-  
     def eval(self, pred_result):
         """
         Args:
@@ -250,23 +257,24 @@ class BagREDataset(data.Dataset):
             rec.append(float(correct) / float(total))
         auc = sklearn.metrics.auc(x=rec, y=prec)
         np_prec = np.array(prec)
-        np_rec = np.array(rec) 
+        np_rec = np.array(rec)
         f1 = (2 * np_prec * np_rec / (np_prec + np_rec + 1e-20)).max()
         mean_prec = np_prec.mean()
         return {'micro_p': np_prec, 'micro_r': np_rec, 'micro_p_mean': mean_prec, 'micro_f1': f1, 'auc': auc}
 
-def BagRELoader(path, rel2id, tokenizer, batch_size, 
-        shuffle, entpair_as_bag=False, bag_size=0, num_workers=8, 
-        collate_fn=BagREDataset.collate_fn):
+
+def BagRELoader(path, rel2id, tokenizer, batch_size,
+                shuffle, entpair_as_bag=False, bag_size=0, num_workers=8,
+                collate_fn=BagREDataset.collate_fn):
     if bag_size == 0:
         collate_fn = BagREDataset.collate_fn
     else:
         collate_fn = BagREDataset.collate_bag_size_fn
     dataset = BagREDataset(path, rel2id, tokenizer, entpair_as_bag=entpair_as_bag, bag_size=bag_size)
     data_loader = data.DataLoader(dataset=dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            pin_memory=True,
-            num_workers=num_workers,
-            collate_fn=collate_fn)
+                                  batch_size=batch_size,
+                                  shuffle=shuffle,
+                                  pin_memory=True,
+                                  num_workers=num_workers,
+                                  collate_fn=collate_fn)
     return data_loader

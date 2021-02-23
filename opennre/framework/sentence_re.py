@@ -5,21 +5,22 @@ from torch import nn, optim
 from .data_loader import SentenceRELoader
 from .utils import AverageMeter
 
+
 class SentenceRE(nn.Module):
 
-    def __init__(self, 
+    def __init__(self,
                  model,
-                 train_path, 
-                 val_path, 
+                 train_path,
+                 val_path,
                  test_path,
-                 ckpt, 
-                 batch_size=32, 
-                 max_epoch=100, 
-                 lr=0.1, 
-                 weight_decay=1e-5, 
+                 ckpt,
+                 batch_size=32,
+                 max_epoch=100,
+                 lr=0.1,
+                 weight_decay=1e-5,
                  warmup_step=300,
                  opt='sgd'):
-    
+
         super().__init__()
         self.max_epoch = max_epoch
         # Load data
@@ -38,7 +39,7 @@ class SentenceRE(nn.Module):
                 model.sentence_encoder.tokenize,
                 batch_size,
                 False)
-        
+
         if test_path != None:
             self.test_loader = SentenceRELoader(
                 test_path,
@@ -59,19 +60,19 @@ class SentenceRE(nn.Module):
             self.optimizer = optim.SGD(params, lr, weight_decay=weight_decay)
         elif opt == 'adam':
             self.optimizer = optim.Adam(params, lr, weight_decay=weight_decay)
-        elif opt == 'adamw': # Optimizer for BERT
+        elif opt == 'adamw':  # Optimizer for BERT
             from transformers import AdamW
             params = list(self.named_parameters())
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             grouped_params = [
                 {
-                    'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 
+                    'params': [p for n, p in params if not any(nd in n for nd in no_decay)],
                     'weight_decay': 0.01,
                     'lr': lr,
                     'ori_lr': lr
                 },
                 {
-                    'params': [p for n, p in params if any(nd in n for nd in no_decay)], 
+                    'params': [p for n, p in params if any(nd in n for nd in no_decay)],
                     'weight_decay': 0.0,
                     'lr': lr,
                     'ori_lr': lr
@@ -84,7 +85,8 @@ class SentenceRE(nn.Module):
         if warmup_step > 0:
             from transformers import get_linear_schedule_with_warmup
             training_steps = self.train_loader.dataset.__len__() // batch_size * self.max_epoch
-            self.scheduler = get_linear_schedule_with_warmup(self.optimizer, num_warmup_steps=warmup_step, num_training_steps=training_steps)
+            self.scheduler = get_linear_schedule_with_warmup(self.optimizer, num_warmup_steps=warmup_step,
+                                                             num_training_steps=training_steps)
         else:
             self.scheduler = None
         # Cuda
@@ -109,11 +111,12 @@ class SentenceRE(nn.Module):
                             data[i] = data[i].cuda()
                         except:
                             pass
+                # with torch.no_grad():# TODO
                 label = data[0]
                 args = data[1:]
                 logits = self.parallel_model(*args)
                 loss = self.criterion(logits, label)
-                score, pred = logits.max(-1) # (B)
+                score, pred = logits.max(-1)  # (B)
                 acc = float((pred == label).long().sum()) / label.size(0)
                 # Log
                 avg_loss.update(loss.item(), 1)
@@ -126,9 +129,10 @@ class SentenceRE(nn.Module):
                     self.scheduler.step()
                 self.optimizer.zero_grad()
                 global_step += 1
-            # Val 
+            # Val
             logging.info("=== Epoch %d val ===" % epoch)
-            result = self.eval_model(self.val_loader) 
+            # with torch.no_grad():  # TODO
+            result = self.eval_model(self.val_loader)
             logging.info('Metric {} current / best: {} / {}'.format(metric, result[metric], best_metric))
             if result[metric] > best_metric:
                 logging.info("Best ckpt and saved.")
@@ -153,9 +157,9 @@ class SentenceRE(nn.Module):
                         except:
                             pass
                 label = data[0]
-                args = data[1:]        
+                args = data[1:]
                 logits = self.parallel_model(*args)
-                score, pred = logits.max(-1) # (B)
+                score, pred = logits.max(-1)  # (B)
                 # Save result
                 for i in range(pred.size(0)):
                     pred_result.append(pred[i].item())
@@ -168,4 +172,3 @@ class SentenceRE(nn.Module):
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
-
