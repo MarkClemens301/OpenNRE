@@ -29,7 +29,7 @@ parser.add_argument('--mask_entity', action='store_true',
 # Data
 parser.add_argument('--metric', default='micro_f1', choices=['micro_f1', 'acc'],
                     help='Metric for picking up best checkpoint')
-parser.add_argument('--dataset', default='none', choices=['none', 'semeval', 'wiki80', 'tacred'],
+parser.add_argument('--dataset', default='semeval', choices=['none', 'semeval', 'wiki80', 'tacred'],
                     help='Dataset. If not none, the following args can be ignored')
 parser.add_argument('--train_file', default='train_data/train_data_0917.json', type=str,  # TODO
                     help='Training data file')
@@ -45,7 +45,7 @@ parser.add_argument('--batch_size', default=1, type=int,  # 64
                     help='Batch size')
 parser.add_argument('--lr', default=2e-5, type=float,
                     help='Learning rate')
-parser.add_argument('--max_length', default=64, type=int,  # 128
+parser.add_argument('--max_length', default=128, type=int,  # 128
                     help='Maximum sentence length')
 parser.add_argument('--max_epoch', default=3, type=int,#3
                     help='Max number of training epochs')

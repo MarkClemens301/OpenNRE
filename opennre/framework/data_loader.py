@@ -108,7 +108,7 @@ class SentenceREDataset(data.Dataset):
 
 
 def SentenceRELoader(path, rel2id, tokenizer, batch_size,
-                     shuffle, num_workers=0, collate_fn=SentenceREDataset.collate_fn, **kwargs):  # TODO num_workers=8,
+                     shuffle, num_workers=8, collate_fn=SentenceREDataset.collate_fn, **kwargs):  # TODO num_workers=8,
     dataset = SentenceREDataset(path=path, rel2id=rel2id, tokenizer=tokenizer, kwargs=kwargs)
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batch_size,
