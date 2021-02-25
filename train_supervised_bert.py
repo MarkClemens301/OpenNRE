@@ -1,7 +1,7 @@
 # coding:utf-8
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # no gpu
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # no gpu
 
 import torch
 import numpy as np
