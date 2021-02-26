@@ -1,7 +1,9 @@
 # coding:utf-8
 import os
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # no gpu
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # todo  use cpu
+# https://github.com/thunlp/OpenNRE/blob/master/example/train_supervised_bert.py
+# https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-config.json
 
 import torch
 import numpy as np
@@ -15,13 +17,15 @@ import logging
 print(torch.cuda.is_available())
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--pretrain_path', default='pretrain/bert-base-uncased',
+parser.add_argument('--pretrain_path', default='bert-base-uncased',  # be a root folder, no /
                     help='Pre-trained ckpt path / model name (hugginface)')
 parser.add_argument('--ckpt', default='',
                     help='Checkpoint name')
 parser.add_argument('--pooler', default='entity', choices=['cls', 'entity'],
                     help='Sentence representation pooler')
-parser.add_argument('--only_test', action='store_true',
+parser.add_argument('--only_test',
+                    # default='True',  # todo  1. not add (default)  2. add
+                    action='store_true',
                     help='Only run test')
 parser.add_argument('--mask_entity', action='store_true',
                     help='Mask entity mentions')
@@ -29,9 +33,9 @@ parser.add_argument('--mask_entity', action='store_true',
 # Data
 parser.add_argument('--metric', default='micro_f1', choices=['micro_f1', 'acc'],
                     help='Metric for picking up best checkpoint')
-parser.add_argument('--dataset', default='semeval', choices=['none', 'semeval', 'wiki80', 'tacred'],
+parser.add_argument('--dataset', default='none', choices=['none', 'semeval', 'wiki80', 'tacred'],
                     help='Dataset. If not none, the following args can be ignored')
-parser.add_argument('--train_file', default='train_data/train_data_0917.json', type=str,  # TODO
+parser.add_argument('--train_file', default='train_data/train_data_0917.json', type=str,  # todo change
                     help='Training data file')
 parser.add_argument('--val_file', default='train_data/val_data_0917.json', type=str,
                     help='Validation data file')
@@ -41,13 +45,13 @@ parser.add_argument('--rel2id_file', default='train_data/semeval_rel2id.json', t
                     help='Relation to ID file')
 
 # Hyper-parameters
-parser.add_argument('--batch_size', default=1, type=int,  # 64
+parser.add_argument('--batch_size', default=4, type=int,  # 64 todo bs=1
                     help='Batch size')
 parser.add_argument('--lr', default=2e-5, type=float,
                     help='Learning rate')
 parser.add_argument('--max_length', default=128, type=int,  # 128
                     help='Maximum sentence length')
-parser.add_argument('--max_epoch', default=3, type=int,#3
+parser.add_argument('--max_epoch', default=3, type=int,  # 3
                     help='Max number of training epochs')
 
 args = parser.parse_args()
@@ -59,7 +63,7 @@ if not os.path.exists('./ckpt'):
     os.mkdir('./ckpt')
 if len(args.ckpt) == 0:
     args.ckpt = '{}_{}_{}'.format(args.dataset, args.pretrain_path, args.pooler)
-ckpt = 'ckpt/{}.pth.tar'.format(args.ckpt)
+ckpt = 'ckpt/{}.pth.tar'.format(args.ckpt)  # todo 'ckpt/semeval_【pretrain\\bert-base-uncased】_entity.pth.tar'
 
 if args.dataset != 'none':
     opennre.download(args.dataset, root_path=root_path)
@@ -88,7 +92,7 @@ rel2id = json.load(open(args.rel2id_file))
 
 # Define the sentence encoder
 if args.pooler == 'entity':
-    sentence_encoder = opennre.encoder.BERTEntityEncoder(
+    sentence_encoder = opennre.encoder.BERTEntityEncoder(  # todo config
         max_length=args.max_length,
         pretrain_path=args.pretrain_path,
         mask_entity=args.mask_entity
@@ -105,6 +109,7 @@ else:
 # Define the model
 model = opennre.model.SoftmaxNN(sentence_encoder, len(rel2id), rel2id)
 
+print('args.batch_size,', args.batch_size)
 # Define the whole training framework
 framework = opennre.framework.SentenceRE(  # SentenceRE.SentenceRELoader.SentenceREDataset
     train_path=args.train_file,  # opennre/framework/data_loader.py:106  # num_workers=0
@@ -112,7 +117,7 @@ framework = opennre.framework.SentenceRE(  # SentenceRE.SentenceRELoader.Sentenc
     test_path=args.test_file,
     model=model,
     ckpt=ckpt,
-    batch_size=args.batch_size,
+    batch_size=args.batch_size,  # todo bs / num_workers=0
     max_epoch=args.max_epoch,
     lr=args.lr,
     opt='adamw'
@@ -120,7 +125,8 @@ framework = opennre.framework.SentenceRE(  # SentenceRE.SentenceRELoader.Sentenc
 
 # Train the model
 if not args.only_test:
-    framework.train_model('micro_f1')  # === Epoch 0 train ===
+    framework.train_model('micro_f1')  # todo train val
+    print('train-model saved')
 
 # Test
 framework.load_state_dict(torch.load(ckpt)['state_dict'])

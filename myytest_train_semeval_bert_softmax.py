@@ -1,13 +1,11 @@
 # coding:utf-8
-# import sys
-# sys.path.append(r'D:\Public\Documents\GitHub\OpenNRE')
+import os
 
 import torch
 import numpy as np
 import json
 import opennre
 from opennre import encoder, model, framework
-import os
 
 # Some basic settings
 root_path = '.'
@@ -19,7 +17,8 @@ if not os.path.exists('ckpt'):
 # opennre.download('bert_base_uncased', root_path=root_path)
 
 ckpt = 'ckpt/semeval_bert_softmax.pth.tar'
-rel2id = json.load(open(r'./train_data/semeval_rel2id.json'))  # , 'r', encoding='utf-8'
+rel2id = json.load(open('benchmark/test_data/semeval_rel2id.json'))
+import os
 
 print(torch.cuda.is_available())
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1,2'
@@ -35,22 +34,20 @@ model = opennre.model.SoftmaxNN(sentence_encoder, len(rel2id), rel2id)
 #     model.to(device)
 
 framework = opennre.framework.SentenceRE(
-    train_path='./train_data/train_data_0917.json',  # txt or json 格式为json多行
-    val_path='./train_data/val_data_0917.json',
-    test_path='./train_data/test_data_0917.json',
+    train_path='benchmark/test_data/semeval_train.txt',
+    val_path='benchmark/test_data/semeval_val.txt',
+    test_path='benchmark/test_data/semeval_test.txt',
     model=model,
     ckpt=ckpt,
-    batch_size=1,#8
+    batch_size=8,  # todo
     max_epoch=2,
     lr=3e-5,
     opt='adam')
 # Train
 framework.train_model(metric='micro_f1')
-
 # Test
 framework.load_state_dict(torch.load(ckpt)['state_dict'])
-with torch.no_grad():#TODO
-    result = framework.eval_model(framework.test_loader)
+result = framework.eval_model(framework.test_loader)
 print('Accuracy on test set: {}'.format(result['acc']))
 print('Micro Precision: {}'.format(result['micro_p']))
 print('Micro Recall: {}'.format(result['micro_r']))

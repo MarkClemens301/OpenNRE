@@ -14,7 +14,7 @@ class SentenceRE(nn.Module):
                  val_path,
                  test_path,
                  ckpt,
-                 batch_size=32,
+                 batch_size=32,  # pre-todo
                  max_epoch=100,
                  lr=0.1,
                  weight_decay=1e-5,
@@ -129,6 +129,7 @@ class SentenceRE(nn.Module):
                     self.scheduler.step()
                 self.optimizer.zero_grad()
                 global_step += 1
+                # del data  # todo
             # Val
             logging.info("=== Epoch %d val ===" % epoch)
             # with torch.no_grad():  # TODO
@@ -136,7 +137,7 @@ class SentenceRE(nn.Module):
             logging.info('Metric {} current / best: {} / {}'.format(metric, result[metric], best_metric))
             if result[metric] > best_metric:
                 logging.info("Best ckpt and saved.")
-                folder_path = '/'.join(self.ckpt.split('/')[:-1])
+                folder_path = '/'.join(self.ckpt.split('/')[:-1])  # todo
                 if not os.path.exists(folder_path):
                     os.mkdir(folder_path)
                 torch.save({'state_dict': self.model.state_dict()}, self.ckpt)
